@@ -96,3 +96,36 @@ Every operation the skill (or sub-agents) perform should be safe to retry:
 ## When in doubt, escalate
 
 The bias of this system is to escalate rather than guess. The user's time is worth more than one unnecessary escalation. If a sub-agent is uncertain about how to proceed, or if the orchestrator sees inconsistent Jira state (e.g., a subtask marked Done but no Completed comment), pause and ask.
+
+---
+
+## Monitoring background agents — don't trust context alone
+
+**The autonomy-breaking bug to avoid:** when a background agent completes, the orchestrator receives a `<task-notification>` as a tool result. That tool result can roll out of the conversation context window before the orchestrator acts on it — especially during long runs where many other tool calls stack up. The orchestrator then incorrectly reports "still running" when the agent has actually failed, escalated, or completed minutes ago.
+
+**The fix:** on every tick (cron poll, user status query, next-step decision), the orchestrator MUST explicitly poll `TaskOutput(task_id, block: false)` for every known running task_id. Do NOT rely on notifications being in-context. This adds a cheap check that catches silently-completed runs.
+
+### Required polling pattern
+
+Maintain a list of active task IDs (set when you dispatch each background Agent). At every tick:
+
+```
+for each active_task_id:
+  result = TaskOutput(task_id: active_task_id, block: false, timeout: 5000)
+  if result.status == "completed":
+    parse the VERDICT/JIRA_STATUS from result.output
+    advance / loop / escalate per failure-handling rules
+    remove from active list
+  elif result.status == "failed" or "killed":
+    post Failed: comment on the subtask
+    escalate
+    remove from active list
+  else:  # still running
+    check Jira for latest Progress: comment and relay to the user
+```
+
+If the orchestrator skips this check, it's making decisions based on stale in-context notifications — and a notification that's been pushed out of context simply doesn't exist from the orchestrator's perspective. Explicit polling is the only reliable state source for long-running sessions.
+
+### Why Jira comments alone aren't sufficient
+
+Jira's `Failed:` / `Completed:` comments reflect what the sub-agent posted. They DON'T reflect whether the Agent tool task itself crashed (process died before posting), timed out, or was `TaskStop`'d externally. `TaskOutput` reports the task-level state, which is the ground truth. Jira is the workstream state; TaskOutput is the runtime state. Both must be checked.
