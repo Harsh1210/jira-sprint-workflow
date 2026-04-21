@@ -366,8 +366,11 @@ Same structure as subtask 3 but fixing issues flagged in subtask 4's comparison 
 
 **Assignee:** unassigned (Sub Agent)
 
+> [!important] Open a PR. NEVER merge directly to main.
+> Subtask 9 must **open a pull request** to `main` and **wait for a human to click merge**. Direct pushes to `main` bypass the final-human-sanity step and erase GitHub's diff-review surface. The sub-agent's job is to prepare the PR cleanly (push branch → open PR with architect-recommended description → comment PR URL on the Jira subtask), then stop. The orchestrator pauses until the human merges — GitHub Actions takes over from there.
+
 ```markdown
-**Role:** Senior Staff Release Engineer — expert in git merges, production deployments, CI/CD
+**Role:** Senior Staff Release Engineer — expert in git merges, production deployments, CI/CD, PR hygiene
 
 **Context:**
 
@@ -378,17 +381,39 @@ Same structure as subtask 3 but fixing issues flagged in subtask 4's comparison 
 
 **Instructions:**
 
-1. Merge the feature branch to `main`
-2. GitHub Actions auto-deploys via the self-hosted EC2 runner
-3. Monitor the deploy log
-4. Confirm deploy success
-5. Post a Jira comment on THIS subtask with: merge commit hash, deploy log tail, timestamp, production URL
+1. Push the feature branch to origin (if not already pushed).
+2. Open a PR from the feature branch to `main` using `gh pr create` (or raw REST if `gh` is unavailable). The PR description MUST include:
+   - **Summary** of what's being shipped (pull from parent Task's spec section).
+   - **Bundled scope** subsection if the architect review (subtask 8) called out any out-of-scope commits bundled in this PR (e.g., infra/tech-debt fixes). Copy the architect's rationale verbatim.
+   - **Test plan** link/summary (from subtask 1b).
+   - **Rollback plan** — copy from architect review's "Rollback / kill switch" angle.
+3. Post a Jira comment on THIS subtask with:
+   - PR URL
+   - Target branch (`main`)
+   - Final line: `Waiting for human merge.`
+4. Do NOT transition this subtask to Done yet. Leave at `In Progress` until the human merges and the orchestrator verifies the deploy succeeded.
+
+**After the human merges (orchestrator — not this sub-agent):**
+
+1. Detect merge via `gh pr view --json state,mergeCommit` or by checking the commit on `main`.
+2. Monitor GitHub Actions deploy run.
+3. Confirm deploy succeeded (API container restarted, migrations applied, feature accessible on prod URL).
+4. Post a Jira comment with: merge commit hash, deploy log excerpt, timestamp, prod URL.
+5. Transition the subtask to Done.
 
 **Acceptance Criteria:**
-- Merge clean to `main`
-- Deploy succeeded (verified in log)
-- Comment posted with commit hash + timestamp
+- PR opened with correct description (Summary + Bundled scope + Test plan + Rollback)
+- PR URL posted on Jira subtask
+- Subtask stays `In Progress` until human merges and orchestrator confirms deploy
+- After merge: deploy verified, comment posted with commit hash + prod URL, subtask transitioned to Done
 ```
+
+**Why PR-not-direct-merge is non-negotiable:**
+
+- Final human sanity check on the diff before prod
+- GitHub's PR review UI surfaces changes differently than local `git diff` — reviewers catch things the chain missed
+- The PR record is the audit trail — "who approved this prod change" is unambiguous
+- If the architect review flagged bundled-scope commits, the PR description makes them visible to anyone not in the chain
 
 ## Subtask 10 — Prod Sanity Test
 
