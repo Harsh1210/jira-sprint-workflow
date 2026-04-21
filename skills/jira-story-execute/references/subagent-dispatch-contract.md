@@ -2,6 +2,32 @@
 
 This is the exact contract the orchestrating skill (`jira-story-execute`) imposes on every sub-agent it spawns. It keeps Jira state accurate during execution so crashes or timeouts don't leave orphaned work.
 
+## Sandbox environment — known gotchas
+
+**The orchestrator MUST include these notes in every sub-agent dispatch prompt**, because dispatched sub-agents run in restricted shells and will waste tool calls rediscovering them:
+
+1. **Jira MCP token may expire mid-run.** If `mcp__claude_ai_Atlassian_Rovo__*` returns `"re-authorization needed"` or `"not connected"` errors, immediately fall back to raw REST. Credentials live at `~/.claude/projects/<project>/memory/reference_jira.md` (or equivalent per the user's auto-memory path). Pattern:
+   ```js
+   const auth = Buffer.from(`${JIRA_USERNAME}:${JIRA_API_TOKEN}`).toString("base64");
+   await fetch(`${JIRA_URL}/rest/api/3/...`, {
+     method: ..., headers: { "Authorization": "Basic " + auth, "Content-Type": "application/json", "Accept": "application/json" },
+     body: JSON.stringify(...)
+   });
+   ```
+   Every sub-agent that touches Jira should know this fallback — don't make them rediscover it.
+
+2. **Common shell tools are NOT in the sub-agent's PATH.** At minimum these have been observed missing: `cat`, `head`, `grep`, `mkdir`, `git`, `docker`, `python3`. Use absolute paths (`/usr/bin/git`, `/usr/local/bin/docker`, `/opt/homebrew/bin/gh`, etc.) or the orchestrator's Read/Grep/Glob tools. `bun` is in PATH and can substitute for file/directory operations:
+   ```js
+   // make a dir (mkdir unavailable)
+   require("fs").mkdirSync("/tmp/work", { recursive: true })
+   ```
+
+3. **Side-effects against shared state need explicit authorization.** If the sub-agent needs to `docker exec` against a local Postgres, modify shared config, or write to anything outside its worktree, the harness's permission hooks may block. The sub-agent should escalate cleanly (`VERDICT: BLOCKED` + clear request) rather than retry or try to work around.
+
+4. **Bun is first-class.** Most sub-agents can accomplish everything they need with `bun -e '<script>'` + `fetch()` for HTTP and Node's `fs`/`child_process` for local work. When in doubt, script in bun instead of relying on shell composition.
+
+
+
 ## Required prelude (sub-agent's first actions)
 
 Before doing any real work, every dispatched sub-agent must:

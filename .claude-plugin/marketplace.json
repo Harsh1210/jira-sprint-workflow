@@ -10,7 +10,7 @@
       "name": "jira-sprint-workflow",
       "source": ".",
       "description": "End-to-end Jira sprint workflow for Claude Code teams. Ships two skills: jira-story-design (brainstorm → spec → plan → create 11 self-contained subtasks) and jira-story-execute (autonomously walk the chain to Done, pausing only at the human manual-test checkpoint, with full resumability from Jira state).",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "keywords": ["jira", "sprint", "workflow", "subagent", "brainstorming", "planning", "execution", "claude-code", "superpowers"],
       "category": "productivity",
       "license": "MIT"

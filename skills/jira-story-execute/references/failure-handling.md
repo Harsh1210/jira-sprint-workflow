@@ -97,6 +97,39 @@ Every operation the skill (or sub-agents) perform should be safe to retry:
 
 The bias of this system is to escalate rather than guess. The user's time is worth more than one unnecessary escalation. If a sub-agent is uncertain about how to proceed, or if the orchestrator sees inconsistent Jira state (e.g., a subtask marked Done but no Completed comment), pause and ask.
 
+## Skipping fix subtasks (3 and 5) when there's nothing to fix
+
+If the main subtask returns cleanly with no findings/failures, the paired fix subtask has no work. Don't dispatch a sub-agent for it — that wastes tokens on a no-op.
+
+- **Subtask 2 (Code Review) returns 0 BLOCKER + 0 MAJOR findings** → skip subtask 3. Orchestrator posts `Skipped: subtask 2 returned 0 blockers / 0 majors — no fixes required.` on subtask 3 and transitions it to Done directly.
+- **Subtask 4 (UI Testing) returns all PASS** → skip subtask 5. Orchestrator posts `Skipped: subtask 4 returned 18/18 PASS — no UI fixes required.` on subtask 5 and transitions it to Done directly.
+
+In both cases, the orchestrator's next action is to advance to the subtask after the fix (i.e., 4 after skipping 3, or 6 after skipping 5). This was validated on the first live run: WFR-20 was skipped when WFR-19 cycle 2 returned 18/18 PASS, and the chain proceeded directly to WFR-21.
+
+## Pre-existing bugs discovered mid-chain
+
+A sub-agent sometimes discovers a bug unrelated to the Story's scope but blocking the chain's execution (e.g., a schema migration can't apply because of drift in a shared library). Options, in preferred order:
+
+1. **Fix inline + flag for architect review** (default for small, defensive fixes)
+   - Orchestrator acknowledges the discovery, produces a minimal fix on the feature branch
+   - The fix gets its own commit with a clear `chore:` prefix and message explaining it's tech-debt adjacent to the feature
+   - Subtask 8 (Architect Review) explicitly evaluates the "bundled-scope commits" decision: bundle with the Story's PR (with callout in the PR description) vs cherry-pick to a separate PR
+   - Validated on WFR-5: bootstrap-migrations.ts drift was fixed inline, bundled with the Story's PR per architect recommendation
+
+2. **Escalate and open a separate Jira task** (for larger fixes or scope-creep risks)
+   - If the fix is non-trivial (>1 file, >20 lines, or crosses module boundaries), escalate to the user
+   - Open a new Jira task for the fix; link to the blocked Story as "is blocked by"
+   - Pause the Story's chain until the fix ships via its own chain
+
+3. **Work around** (last resort — only if fix is unsafe from the current environment)
+   - Example: applying a migration manually from `docker exec` because bootstrap isn't fixed yet
+   - MUST be accompanied by option 1 or 2 — workarounds leave the root cause in place
+
+### What to avoid
+
+- Don't iterate on the fix more than 2 cycles without escalating. The WFR-5 run hit 3 commits on bootstrap-migrations.ts before getting it right — that should have escalated sooner.
+- Don't mix fix commits and Story commits on the same code change. Keep bundled commits separately-authored so they can be cherry-picked later if needed.
+
 ---
 
 ## Monitoring background agents — don't trust context alone
