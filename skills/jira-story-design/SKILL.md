@@ -20,7 +20,15 @@ This is the single most important rule. Everything else supports it.
 
 ## Configuration (set once per team)
 
-This skill reads values from the plugin's user config — values you set when you installed the plugin. If any are missing, prompt the user to run `/plugin configure jira-sprint-workflow`.
+This skill reads values from the plugin's user config — values you set when you installed the plugin.
+
+**Config gate (run this first, every invocation):** read `~/.claude/settings.json` and check that `pluginConfigs["jira-sprint-workflow@jira-sprint-workflow"].options` contains non-empty values for *all* of `jira_url`, `jira_username`, `jira_api_token`, `project_key`, `default_owner_account_id`, `components`, `plans_directory`, `specs_directory`. If any are missing or empty:
+
+1. Tell the user: "I need to finish plugin setup before I can design this. Handing off to the setup walkthrough — it'll take about two minutes."
+2. Invoke the `jira-setup` skill (via the Skill tool).
+3. When it returns, resume from the user's original prompt.
+
+Do not try to work around missing config by asking the user values inline — the setup skill handles validation and persistence correctly in one place.
 
 | Config key | Purpose |
 |---|---|

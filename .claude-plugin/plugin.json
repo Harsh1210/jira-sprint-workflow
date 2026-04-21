@@ -1,7 +1,7 @@
 {
   "name": "jira-sprint-workflow",
-  "version": "0.5.1",
-  "description": "End-to-end Jira sprint workflow for Claude Code teams. Three skills: (1) jira-story-design brainstorms a feature, embeds the spec in Jira, generates an implementation plan, and creates 11 self-contained subtasks; (2) jira-story-execute autonomously walks the chain to Done, pausing only at the human manual-test checkpoint, with full resumability from Jira state; (3) jira-architect-review performs a right-sized production-readiness review (3 / 5 / 7 / 10 angles based on the diff) at subtask 8 or any time a change needs shipping-risk assessment.",
+  "version": "0.6.0",
+  "description": "End-to-end Jira sprint workflow for Claude Code teams. Four skills: (1) jira-setup — guided first-time setup that walks users through API token generation, auto-discovers account ID and projects, and validates live against Jira; (2) jira-story-design — brainstorms a feature, embeds the spec in Jira, generates an implementation plan, and creates 11 self-contained subtasks; (3) jira-story-execute — autonomously walks the chain to Done, pausing only at the human manual-test checkpoint, with full resumability from Jira state; (4) jira-architect-review — right-sized production-readiness review (3 / 5 / 7 / 10 angles based on the diff) at subtask 8 or any time a change needs shipping-risk assessment. The design/execute/review skills all gate on config and hand off to jira-setup automatically if any value is missing.",
   "author": {
     "name": "Harsh Agarwal",
     "email": "harsh12101998@gmail.com"

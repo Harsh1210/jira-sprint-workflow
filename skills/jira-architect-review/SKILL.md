@@ -28,6 +28,10 @@ The 10-angle review was designed for framework-level changes. Applying it to eve
 
 If the user gives a Story key, fetch the parent Task + branch info + any prior review findings.
 
+## Config gate (run before step 1)
+
+This skill reads the same plugin user config as the other skills (`jira_url`, `jira_username`, `jira_api_token`, `project_key`, etc.). Before proceeding, verify `pluginConfigs["jira-sprint-workflow@jira-sprint-workflow"].options` in `~/.claude/settings.json` has all eight fields populated. If any are missing, invoke the `jira-setup` skill first, then resume.
+
 ## Step-by-step
 
 ### Step 1 — Read the parent Task + branch

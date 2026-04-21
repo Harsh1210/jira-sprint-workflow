@@ -22,6 +22,14 @@ Every sub-agent this skill dispatches MUST:
 
 This rule is non-negotiable. The sub-agent dispatch contract (in `references/subagent-dispatch-contract.md`) enforces it.
 
+## Config gate (run before anything else)
+
+Read `~/.claude/settings.json` and verify `pluginConfigs["jira-sprint-workflow@jira-sprint-workflow"].options` has non-empty values for all eight fields: `jira_url`, `jira_username`, `jira_api_token`, `project_key`, `default_owner_account_id`, `components`, `plans_directory`, `specs_directory`. If any are missing:
+
+1. Tell the user: "Plugin config is incomplete — I'll run the setup walkthrough first (~2 min), then come back and execute."
+2. Invoke the `jira-setup` skill.
+3. When it returns, resume from the user's "pick up/execute/continue `<KEY>`" prompt.
+
 ## Environment assumption
 
 **Single-user, single-worktree.** The user who invokes this skill is the only person working in the worktree that subtask 0 created. All sub-agents this skill dispatches inherit that worktree — they chdir into it before doing anything.

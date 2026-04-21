@@ -63,11 +63,32 @@ From a Claude Code session:
 /plugin install jira-sprint-workflow
 ```
 
-You'll be prompted for the user config values below.
+### Step 3 — Run the guided setup
 
-### Step 3 — Configure
+After install, in any Claude Code session say:
 
-The plugin prompts for these values on install (stored per-user, secrets in keychain):
+```
+set up the jira plugin
+```
+
+This triggers the `jira-setup` skill, which walks you through the whole thing in ~2 minutes:
+
+1. Asks for your Jira Cloud URL and email
+2. Opens `https://id.atlassian.com/manage-profile/security/api-tokens` in your browser so you can generate an API token, then validates it with a live call
+3. Auto-discovers your `accountId` via `/rest/api/3/myself` (no hunting for it in Jira)
+4. Lists the projects you have access to and lets you pick the target project
+5. Lists the project's existing Components, offers to add missing ones (creates them via API if you have permission)
+6. Confirms defaults for `plans_directory` (`docs/superpowers/plans`) and `specs_directory` (`docs/superpowers/specs`)
+7. Validates the full config with a final API round-trip
+8. Writes everything to `~/.claude/settings.json` under `pluginConfigs` so the three workflow skills pick it up
+
+The other skills in this plugin (`jira-story-design`, `jira-story-execute`, `jira-architect-review`) all run a config gate on invocation — if they detect missing or empty fields, they hand off to `jira-setup` automatically before proceeding. You never end up midway through designing a Story with a broken auth token.
+
+Restart Claude Code (or `/plugin reload`) after setup so the new config takes effect.
+
+### Config values collected
+
+The setup skill collects these (stored in `~/.claude/settings.json` under `pluginConfigs.jira-sprint-workflow@jira-sprint-workflow.options`; `jira_api_token` can live in the OS keychain instead if you prefer — run `/plugin configure jira-sprint-workflow` and re-enter just the token):
 
 | Config key | Example value | Purpose |
 |---|---|---|
@@ -80,7 +101,7 @@ The plugin prompts for these values on install (stored per-user, secrets in keyc
 | `plans_directory` | `docs/plans` | Where implementation plans + test plans are saved in the repo |
 | `specs_directory` | `docs/specs` | Where design specs are saved |
 
-You can reconfigure later with `/plugin configure jira-sprint-workflow`.
+You can reconfigure later by either (a) running `/plugin configure jira-sprint-workflow` (CLI-driven, masks sensitive input) or (b) saying "reconfigure jira plugin" to re-trigger the `jira-setup` skill (interactive, validates live against Jira).
 
 ### Step 4 — Jira project prep (one-time)
 
