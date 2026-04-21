@@ -6,11 +6,25 @@ A Claude Code plugin that turns a one-line Jira intake ticket into a fully-desig
 
 ## What it does
 
-A single skill (`jira-story-design`) orchestrates the full design-to-handoff flow:
+Two skills covering the full end-to-end flow:
+
+### `jira-story-design` — Phase 1 (design)
 
 ```
 Brainstorm → Embed spec in Jira → Implementation plan → Test plan → 11 self-contained subtasks → "is blocked by" chain → Selected for Development
 ```
+
+Activates on prompts like `let's design WFR-42`, `brainstorm this and create the tasks`, `break this into subtasks`.
+
+### `jira-story-execute` — Phase 2 (execution)
+
+```
+Pick up Story → Autonomously walk 11-subtask chain → Pause at subtask 7 (human manual test) → Resume → Done
+```
+
+Activates on prompts like `pick up WFR-42`, `execute WFR-42`, `continue WFR-42`.
+
+Sub-agents dispatched by Phase 2 transition their subtask to `In Progress` and post incremental `Progress:` comments as they work, so any crashed or paused run resumes cleanly from Jira state alone.
 
 ### The 11-subtask chain
 
@@ -22,7 +36,7 @@ Brainstorm → Embed spec in Jira → Implementation plan → Test plan → 11 s
        └─→ 1b. Test Cases → 2. Code Review → 3. Fix → 4. UI Test → 5. Fix → 6. Local Deploy → 7. Manual Test [human] → 8. Architect Review → 9. Push to Prod → 10. Prod Sanity
 ```
 
-**One human checkpoint** (step 7 — Manual Testing, assigned to the Story owner). Everything else runs via sub-agents.
+**One human checkpoint** (step 7 — Manual Testing, assigned to the Story owner). Everything else runs via sub-agents. Fix loops (2↔3 and 4↔5) cap at 3 cycles before escalating.
 
 ### Fields set automatically per subtask
 

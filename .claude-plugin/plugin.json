@@ -1,7 +1,7 @@
 {
   "name": "jira-sprint-workflow",
-  "version": "0.2.0",
-  "description": "End-to-end Jira sprint workflow for Claude Code teams — brainstorm a feature, embed the spec directly in a Jira issue, generate an implementation plan with test plan, and create a chain of 11 self-contained subtasks (with \"is blocked by\" links and correct assignees) so a teammate or sub-agent can pick up any step without leaving Jira.",
+  "version": "0.3.0",
+  "description": "End-to-end Jira sprint workflow for Claude Code teams. Two skills: (1) jira-story-design brainstorms a feature, embeds the spec in Jira, generates an implementation plan, and creates 11 self-contained subtasks; (2) jira-story-execute autonomously walks the chain to Done, pausing only at the human manual-test checkpoint, with full resumability from Jira state.",
   "author": {
     "name": "Harsh Agarwal",
     "email": "harsh12101998@gmail.com"
