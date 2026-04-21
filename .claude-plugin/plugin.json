@@ -1,0 +1,47 @@
+{
+  "name": "jira-sprint-workflow",
+  "version": "0.2.0",
+  "description": "End-to-end Jira sprint workflow for Claude Code teams — brainstorm a feature, embed the spec directly in a Jira issue, generate an implementation plan with test plan, and create a chain of 11 self-contained subtasks (with \"is blocked by\" links and correct assignees) so a teammate or sub-agent can pick up any step without leaving Jira.",
+  "author": {
+    "name": "Harsh Agarwal",
+    "email": "harsh12101998@gmail.com"
+  },
+  "homepage": "https://github.com/Harsh1210/jira-sprint-workflow",
+  "repository": "https://github.com/Harsh1210/jira-sprint-workflow",
+  "license": "MIT",
+  "keywords": ["jira", "sprint", "workflow", "subagent", "brainstorming", "planning", "claude-code"],
+  "userConfig": {
+    "jira_url": {
+      "description": "Your Jira Cloud base URL, e.g. https://myteam.atlassian.net",
+      "sensitive": false
+    },
+    "jira_username": {
+      "description": "Your Jira account email (used with the API token for Basic auth)",
+      "sensitive": false
+    },
+    "jira_api_token": {
+      "description": "Your Jira API token — generate at https://id.atlassian.com/manage-profile/security/api-tokens",
+      "sensitive": true
+    },
+    "project_key": {
+      "description": "The Jira project key where Stories and Subtasks will be created (e.g. WFR, ENG, TECH)",
+      "sensitive": false
+    },
+    "default_owner_account_id": {
+      "description": "Default assignee for parent Tasks and Subtask 7 (Manual Testing). Use Jira account ID, not email. Find yours at https://<your-jira>.atlassian.net/rest/api/3/myself",
+      "sensitive": false
+    },
+    "components": {
+      "description": "Comma-separated list of your Jira Components / product areas (e.g. 'Backend,Frontend,Infrastructure'). Create these via Jira Project Settings → Components if they don't exist.",
+      "sensitive": false
+    },
+    "plans_directory": {
+      "description": "Repo path (relative to your working copy) where implementation plans and test plans are stored. Default: docs/superpowers/plans",
+      "sensitive": false
+    },
+    "specs_directory": {
+      "description": "Repo path where design specs are stored. Default: docs/superpowers/specs",
+      "sensitive": false
+    }
+  }
+}

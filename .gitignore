@@ -1,0 +1,10 @@
+.DS_Store
+node_modules/
+*.log
+.env
+.env.*
+!.env.example
+
+# skill-creator eval artifacts (test outputs, not part of the plugin)
+skills/**/evals/
+skills/**-workspace/
