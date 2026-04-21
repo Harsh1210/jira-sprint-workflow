@@ -8,12 +8,13 @@
   "plugins": [
     {
       "name": "jira-sprint-workflow",
-      "source": ".",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/Harsh1210/jira-sprint-workflow.git"
+      },
       "description": "End-to-end Jira sprint workflow for Claude Code teams. Ships three skills: jira-story-design (brainstorm → spec → plan → create 11 self-contained subtasks), jira-story-execute (autonomously walk the chain to Done, pausing only at the human manual-test checkpoint, with full resumability from Jira state), and jira-architect-review (right-sized production-readiness review — 3 / 5 / 7 / 10 angles scaled to the diff).",
       "version": "0.5.0",
-      "keywords": ["jira", "sprint", "workflow", "subagent", "brainstorming", "planning", "execution", "claude-code", "superpowers"],
-      "category": "productivity",
-      "license": "MIT"
+      "strict": true
     }
   ]
 }
