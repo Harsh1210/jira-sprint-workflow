@@ -1,6 +1,6 @@
 {
   "name": "jira-sprint-workflow",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "End-to-end Jira sprint workflow for Claude Code teams. Three skills: (1) jira-story-design brainstorms a feature, embeds the spec in Jira, generates an implementation plan, and creates 11 self-contained subtasks; (2) jira-story-execute autonomously walks the chain to Done, pausing only at the human manual-test checkpoint, with full resumability from Jira state; (3) jira-architect-review performs a right-sized production-readiness review (3 / 5 / 7 / 10 angles based on the diff) at subtask 8 or any time a change needs shipping-risk assessment.",
   "author": {
     "name": "Harsh Agarwal",
@@ -12,36 +12,45 @@
   "keywords": ["jira", "sprint", "workflow", "subagent", "brainstorming", "planning", "claude-code"],
   "userConfig": {
     "jira_url": {
-      "description": "Your Jira Cloud base URL, e.g. https://myteam.atlassian.net",
-      "sensitive": false
+      "type": "string",
+      "title": "Jira Cloud URL",
+      "description": "Your Jira Cloud base URL, e.g. https://myteam.atlassian.net"
     },
     "jira_username": {
-      "description": "Your Jira account email (used with the API token for Basic auth)",
-      "sensitive": false
+      "type": "string",
+      "title": "Jira Username / Email",
+      "description": "Your Jira account email (used with the API token for Basic auth)"
     },
     "jira_api_token": {
+      "type": "string",
+      "title": "Jira API Token",
       "description": "Your Jira API token — generate at https://id.atlassian.com/manage-profile/security/api-tokens",
       "sensitive": true
     },
     "project_key": {
-      "description": "The Jira project key where Stories and Subtasks will be created (e.g. WFR, ENG, TECH)",
-      "sensitive": false
+      "type": "string",
+      "title": "Jira Project Key",
+      "description": "The Jira project key where Stories and Subtasks will be created (e.g. WFR, ENG, TECH)"
     },
     "default_owner_account_id": {
-      "description": "Default assignee for parent Tasks and Subtask 7 (Manual Testing). Use Jira account ID, not email. Find yours at https://<your-jira>.atlassian.net/rest/api/3/myself",
-      "sensitive": false
+      "type": "string",
+      "title": "Default Owner Account ID",
+      "description": "Default assignee for parent Tasks and Subtask 7 (Manual Testing). Use Jira account ID, not email. Find yours at https://<your-jira>.atlassian.net/rest/api/3/myself"
     },
     "components": {
-      "description": "Comma-separated list of your Jira Components / product areas (e.g. 'Backend,Frontend,Infrastructure'). Create these via Jira Project Settings → Components if they don't exist.",
-      "sensitive": false
+      "type": "string",
+      "title": "Jira Components (comma-separated)",
+      "description": "Comma-separated list of your Jira Components / product areas (e.g. 'Backend,Frontend,Infrastructure'). Create these via Jira Project Settings → Components if they don't exist."
     },
     "plans_directory": {
-      "description": "Repo path (relative to your working copy) where implementation plans and test plans are stored. Default: docs/superpowers/plans",
-      "sensitive": false
+      "type": "string",
+      "title": "Plans Directory",
+      "description": "Repo path (relative to your working copy) where implementation plans and test plans are stored. Default: docs/superpowers/plans"
     },
     "specs_directory": {
-      "description": "Repo path where design specs are stored. Default: docs/superpowers/specs",
-      "sensitive": false
+      "type": "string",
+      "title": "Specs Directory",
+      "description": "Repo path where design specs are stored. Default: docs/superpowers/specs"
     }
   }
 }
