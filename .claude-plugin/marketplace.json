@@ -1,0 +1,19 @@
+{
+  "name": "jira-sprint-workflow",
+  "owner": {
+    "name": "Harsh Agarwal",
+    "email": "harsh12101998@gmail.com",
+    "url": "https://github.com/Harsh1210"
+  },
+  "plugins": [
+    {
+      "name": "jira-sprint-workflow",
+      "source": ".",
+      "description": "End-to-end Jira sprint workflow — brainstorm a feature, embed the spec in a Jira issue, generate an implementation plan with test cases, and create a self-contained 11-subtask chain with is-blocked-by links so teammates or sub-agents can execute without leaving Jira.",
+      "version": "0.2.0",
+      "keywords": ["jira", "sprint", "workflow", "subagent", "brainstorming", "planning", "claude-code", "superpowers"],
+      "category": "productivity",
+      "license": "MIT"
+    }
+  ]
+}
