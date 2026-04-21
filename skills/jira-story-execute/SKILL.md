@@ -165,9 +165,10 @@ Reads the same user config as `jira-story-design`:
 ## Related skills
 
 - `jira-story-design` — creates the Story + 11 subtasks (prerequisite for this skill to have anything to execute)
+- `jira-architect-review` — used by subtask 8; right-sizes the review to 3 / 5 / 7 / 10 angles based on diff size
 - `superpowers:subagent-driven-development` — pattern this skill uses to dispatch per-subtask sub-agents
 - `superpowers:using-git-worktrees` — referenced by subtask 0 (already done by the time this skill runs)
-- `superpowers:code-reviewer` — used by subtask 2 (Code Review) and subtask 8 (Architect Review)
+- `superpowers:code-reviewer` — used by subtask 2 (Code Review) and as a fallback for subtask 8
 
 ## References
 

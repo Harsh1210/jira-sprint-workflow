@@ -323,7 +323,7 @@ Same structure as subtask 3 but fixing issues flagged in subtask 4's comparison 
 
 **Assignee:** unassigned (Sub Agent)
 
-**Approach:** Dispatch via `superpowers:code-reviewer` or a focused review subagent. Pass the full parent Task spec + implementation plan + test plan + git diff as context; frame the agent as a senior enterprise architect reviewing for shipping risk.
+**Approach:** Dispatch via the **`jira-architect-review` skill** (preferred — right-sizes the review to the feature's diff and selects 3 / 5 / 7 / all 10 angles accordingly). Alternatively, `superpowers:code-reviewer` with the full 10-angle checklist as a fallback if `jira-architect-review` is unavailable. Pass the full parent Task spec + implementation plan + test plan + git diff as context; frame the agent as a senior enterprise architect reviewing for shipping risk.
 
 ```markdown
 **Role:** Enterprise Architect — expert in multi-system production readiness reviews across the team's infrastructure. Distinct from subtask 2's code review: that was correctness-focused; this is shipping-risk focused.
