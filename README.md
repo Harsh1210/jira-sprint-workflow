@@ -1,17 +1,23 @@
 # Jira Sprint Workflow Plugin for Claude Code
 
-A Claude Code plugin that turns a one-line Jira intake ticket into a fully-designed, self-contained set of 11 subtasks that any teammate or sub-agent can execute.
+A Claude Code plugin that turns a one-line Jira intake ticket into a fully-designed, self-contained set of 15 subtasks that any teammate or sub-agent can execute.
 
 **The core discipline:** every Jira subtask is self-contained. A teammate picks up a subtask, reads the description, and executes it — no docs folder, no slack thread, no prerequisite context required.
 
 ## What it does
 
-Two skills covering the full end-to-end flow:
+Four skills covering setup + the full end-to-end flow:
+
+### `jira-setup` — guided first-time configuration
+
+Walks you through Jira Cloud URL, email, API token (opens the Atlassian token page in your browser), project picker, auto-discovered account ID, components, and directories. Validates live against `/rest/api/3/myself`. Writes config to `~/.claude/settings.json`. The other three skills hand off to this automatically if any required config is missing.
+
+Activates on prompts like `set up the jira plugin`, `reconfigure jira plugin`, `connect jira`.
 
 ### `jira-story-design` — Phase 1 (design)
 
 ```
-Brainstorm → Embed spec in Jira → Implementation plan → Test plan → 11 self-contained subtasks → "is blocked by" chain → Selected for Development
+Brainstorm → Embed spec in Jira → Implementation plan → Test plan → 15 self-contained subtasks → "is blocked by" chain → Selected for Development
 ```
 
 Activates on prompts like `let's design WFR-42`, `brainstorm this and create the tasks`, `break this into subtasks`.
@@ -19,30 +25,42 @@ Activates on prompts like `let's design WFR-42`, `brainstorm this and create the
 ### `jira-story-execute` — Phase 2 (execution)
 
 ```
-Pick up Story → Autonomously walk 11-subtask chain → Pause at subtask 7 (human manual test) → Resume → Done
+Pick up Story → Autonomously walk 15-subtask chain → Pause at subtask 10 (sandbox manual test) → Resume → Pause at subtask 12 (merge approval) → Resume → Done
 ```
 
 Activates on prompts like `pick up WFR-42`, `execute WFR-42`, `continue WFR-42`.
 
 Sub-agents dispatched by Phase 2 transition their subtask to `In Progress` and post incremental `Progress:` comments as they work, so any crashed or paused run resumes cleanly from Jira state alone.
 
-### The 11-subtask chain
+### The 15-subtask chain
 
 ```
   0. Branch+Worktree
        │
        ├─→ 1. Implement ───┐
        │                    ↓
-       └─→ 1b. Test Cases → 2. Code Review → 3. Fix → 4. UI Test → 5. Fix → 6. Local Deploy → 7. Manual Test [human] → 8. Architect Review → 9. Push to Prod → 10. Prod Sanity
+       └─→ 1b. Test Cases → 2. Code Review → 3. Fix → 4. UI Test → 5. Fix → 6. Local Smoke → 7. Architect Review → 8. Fix → 9. Deploy to Sandbox → 10. Sandbox Manual Test [human ✋] → 11. Fix Sandbox → 12. Merge to Sandbox Branch [human ✋] → 13. Push to Prod (sandbox → main PR) → 14. Prod Sanity
 ```
 
-**One human checkpoint** (step 7 — Manual Testing, assigned to the Story owner). Everything else runs via sub-agents. Fix loops (2↔3 and 4↔5) cap at 3 cycles before escalating.
+**Two human checkpoints**:
+- Step 10 — Sandbox Manual Test (validate the feature on a real-deployed sandbox env)
+- Step 12 — Merge to Sandbox Branch (explicit `Approved — merge to sandbox branch` to join the release train)
+
+Everything else runs via sub-agents. Fix loops (2↔3, 4↔5, 7↔8, and 9→10→11) cap at 3 cycles each before escalating.
+
+### Release train (sandbox as the integration branch)
+
+```
+feature branch ──(subtask 12, with approval)──→ sandbox ──(subtask 13 PR)──→ main (prod)
+```
+
+The `sandbox` branch is the integration buffer — multiple features may merge into `sandbox` before any one of them ships to prod. Subtask 13 opens a `sandbox → main` PR with a release-train manifest listing every feature included.
 
 ### Fields set automatically per subtask
 
 - **Priority** — inherited from parent Task, set explicitly (Jira inheritance for Sub-tasks is unreliable)
 - **Component** — product area from your team's configured components
-- **Assignee** — Sub Agent subtasks are `unassigned` (the signal for autonomous execution); subtask 7 = the Story owner
+- **Assignee** — Sub Agent subtasks are `unassigned` (the signal for autonomous execution); subtasks 10 (Sandbox Manual Test) and 12 (Merge to Sandbox Branch) = the Story owner
 - **"is blocked by" links** — wired per the chain diagram, direction verified on creation
 
 ## Installation
@@ -96,7 +114,7 @@ The setup skill collects these (stored in `~/.claude/settings.json` under `plugi
 | `jira_username` | `jane@acme.com` | Your Jira account email |
 | `jira_api_token` | `ATATT3xFfGF...` | API token (https://id.atlassian.com/manage-profile/security/api-tokens) |
 | `project_key` | `ENG` | Jira project where Tasks + Subtasks live |
-| `default_owner_account_id` | `712020:959044f3-fca7-4abf-8021-c8f2a85aaa74` | Default assignee for parent Tasks + Subtask 7 — find yours at `https://<your-jira>.atlassian.net/rest/api/3/myself` |
+| `default_owner_account_id` | `712020:959044f3-fca7-4abf-8021-c8f2a85aaa74` | Default assignee for parent Tasks + Subtask 10 (Sandbox Manual Test) + Subtask 12 (Merge to Sandbox Branch) — find yours at `https://<your-jira>.atlassian.net/rest/api/3/myself` |
 | `components` | `Backend,Frontend,Infrastructure` | Comma-separated Component names (must already exist in your Jira project) |
 | `plans_directory` | `docs/plans` | Where implementation plans + test plans are saved in the repo |
 | `specs_directory` | `docs/specs` | Where design specs are saved |
@@ -159,8 +177,8 @@ The skill kicks in automatically (matches the trigger phrase), and:
 6. Invokes `superpowers:writing-plans` — produces the implementation plan + test plan
 7. Runs `plan-document-reviewer` per chunk, fixes any issues
 8. Updates ENG-42's description with the full spec (markdown)
-9. Creates 11 subtasks (ENG-43 through ENG-53), each self-contained, each correctly assigned (Jane on parent Task + subtask 7; unassigned on the rest)
-10. Wires 12 "is blocked by" links (0→1, 0→1b, 1→2, ..., 9→10)
+9. Creates 15 subtasks (ENG-43 through ENG-57), each self-contained, each correctly assigned (Jane on parent Task + subtasks 10 and 12; unassigned on the rest)
+10. Wires 16 "is blocked by" links per the chain (0→1, 0→1b, 1→2, ..., 12→13, 13→14)
 11. Transitions ENG-42 to Selected for Development
 12. Reports back with a table of every subtask and its state
 
@@ -168,9 +186,14 @@ A teammate (or a sub-agent) can now pick up ENG-43 ("0. Setup Branch & Worktree"
 
 ## Key design decisions
 
-### Why one human checkpoint?
+### Why two human checkpoints?
 
-The chain has many sub-agent steps because AI is good at: implementation, code review, UI testing with Playwright, Docker builds, prod deploys. The one thing AI can't reliably judge is "does this feel right in the browser as a user would experience it." That's subtask 7 — the human manual test. Everything upstream is automated; everything downstream (architect review, prod push, sanity) runs on the diff the human already validated.
+The chain has many sub-agent steps because AI is good at: implementation, code review, UI testing with Playwright, Docker builds, sandbox deploys, prod deploys. Two things AI can't reliably judge:
+
+1. **"Does this feel right on a real-deployed instance?"** — that's subtask 10 (Sandbox Manual Test). The human walks the feature on a real sandbox environment using structured test cases (What / Preconditions / How / Expected / Pass criteria) that subtask 1b produced. Catches issues that local Docker doesn't surface (infra interactions, third-party integrations, real DNS, real auth flows).
+2. **"Is this feature ready to join the release train?"** — that's subtask 12 (Merge to Sandbox Branch). The human's explicit `Approved — merge to sandbox branch` comment is the audit-trail signal that this feature passed both sandbox manual test AND architect review and should be promoted.
+
+Architect review (subtask 7) runs BEFORE sandbox deploy — gates whether the diff is worth deploying. Local Docker (subtask 6) is automated smoke only, no human walkthrough.
 
 ### Why self-contained subtask descriptions?
 

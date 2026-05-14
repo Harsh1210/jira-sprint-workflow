@@ -1,6 +1,6 @@
 # Subtask description templates
 
-Each of the 11 subtasks has a specific role, instructions, and acceptance criteria. Every subtask description is **self-contained** — a team member should be able to execute a subtask using only the Jira issue.
+Each of the 15 subtasks has a specific role, instructions, and acceptance criteria. Every subtask description is **self-contained** — a team member should be able to execute a subtask using only the Jira issue.
 
 ## Universal skeleton
 
@@ -24,6 +24,29 @@ Every subtask description must contain:
 - [Bullet points of what "done" looks like for THIS subtask]
 ```
 
+## Chain overview (15 subtasks)
+
+```
+0   Setup Branch & Worktree
+1   Implement Feature            ┐
+1b  Plan Functional Test Cases   ┘ (parallel with 1)
+2   Code Review                  ┐
+3   Fix Code Review              ┘ (loop, cap 3)
+4   UI Testing                   ┐
+5   Fix UI Testing               ┘ (loop, cap 3)
+6   Deploy to Local Docker (automated smoke — no human)
+7   Senior Architect Review      ┐
+8   Fix Architect Review         ┘ (loop, cap 3)
+9   Deploy to Sandbox
+10  Sandbox Manual Testing ✋    ┐ (HUMAN gate #1)
+11  Fix Sandbox Issues           ┘ (loop, cap 3 cycling 9→10→11)
+12  Merge to Sandbox Branch ✋   (HUMAN gate #2 — approval to join release train)
+13  Push to Prod (sandbox → main PR)
+14  Prod Sanity Test
+```
+
+Two human gates: subtask 10 (sandbox manual test) and subtask 12 (approval to merge into the sandbox release-train branch). Everything else runs as sub-agents.
+
 ## Subtask 0 — Setup Branch & Worktree
 
 **Assignee:** unassigned (Sub Agent)
@@ -45,6 +68,7 @@ Every subtask description must contain:
 2. Create a git worktree:
    - Path: `~/Documents/workspace/<repo>-worktrees/<PARENT-KEY>-<slug>/`
    - Branch: `feat/<PARENT-KEY>-<slug>` off `main`
+   - Branch off `main` (NOT off `sandbox`) — this feature will be promoted via the release train (feature → sandbox → main, see subtasks 12–13). Sandbox-only experimentation has different rules; this skill targets prod-bound features.
 3. Copy `.env` and any local-only config from the main workspace to the worktree (never debug config that already works — see `feedback_worktree_env`)
 4. Run package installs inside the worktree (`npm install` or `bun install`)
 5. Bring up the Docker stack from the worktree (`docker compose up -d` or equivalent). **NEVER run `docker compose down -v` — it wipes the local DB which has real production data.**
@@ -120,24 +144,48 @@ Every subtask description must contain:
 
    ### Automated Test Cases
    - Each case: `Given / When / Then`, URL, selectors, expected assertions
-   - Consumable by Playwright + a sub-agent (used in subtasks 4 and 10)
+   - Consumable by Playwright + a sub-agent (used in subtasks 4 and 14)
    - Cover happy path, edge cases, error states, regressions
-   - Mark critical cases with `[CRITICAL]` — these are the subset for subtask 10's prod sanity
+   - Mark critical cases with `[CRITICAL]` — these are the subset for subtask 14's prod sanity
 
-   ### Manual Test Cases
-   - Each case: plain-English "do this, verify that" with URL + expected screenshot reference
-   - Consumable by the team member in subtask 7
-   - Include a checkbox per case
-   - Focus on: visual polish, UX feel, keyboard/accessibility, cross-browser, "does this feel right"
+   ### Manual Test Cases (structured, sandbox-ready)
 
-3. Post a Jira comment on THIS subtask with the FULL test plan content embedded (so subtasks 4, 7, 10 can read it from Jira without opening the repo)
+   Each case MUST follow this exact block format so subtask 10 can embed it verbatim and the human reviewer can walk through without opening any other doc:
+
+   ```
+   ### Manual Test Case <N>: <short title>
+
+   **What to test:** [the user-visible behavior being validated — feature, flow, edge case]
+
+   **Preconditions:** [data state, login state, browser/device, environment URL placeholder `<sandbox-url>`]
+
+   **How to test (steps):**
+   1. Open `<sandbox-url>/path`
+   2. Click X
+   3. Enter Y / upload Z
+   4. Submit
+
+   **Expected output:**
+   - [Exact UI state — e.g. "Toast appears reading 'Submission saved'"]
+   - [Persisted state — e.g. "Row appears in /submissions table with status=SUBMITTED"]
+   - [Side effects — e.g. "Email lands in inbox within 30s"]
+
+   **Pass criteria:** ☐ all expected outputs match · screenshot attached
+   ```
+
+   - Cover visual polish, UX feel, keyboard/accessibility, cross-browser, "does this feel right" PLUS critical happy-path flows that the human reviewer can validate end-to-end on sandbox.
+   - The `<sandbox-url>` placeholder is replaced with the actual sandbox URL by subtask 9 (Deploy to Sandbox) when it posts the deploy comment. Subtask 10 (Sandbox Manual Test) substitutes it into the embedded cases.
+   - Aim for 5–10 manual cases for a typical feature.
+
+3. Post a Jira comment on THIS subtask with the FULL test plan content embedded (so subtasks 4, 10, 14 can read it from Jira without opening the repo)
 4. Commit the test plan file to the repo
 
 **Acceptance Criteria:**
 - Test plan file committed with both sections
 - Jira comment on this subtask has the full test plan content (not just a link)
-- At least 3 `[CRITICAL]` cases flagged for regression in subtask 10
-- Manual cases cover UX scenarios automation won't catch
+- At least 3 `[CRITICAL]` cases flagged for regression in subtask 14
+- Manual cases follow the structured block format (What / Preconditions / How / Expected / Pass criteria) — non-negotiable
+- Manual cases cover UX scenarios automation won't catch AND critical happy-path flows
 ```
 
 ## Subtask 2 — Code Review
@@ -258,12 +306,12 @@ Every subtask description must contain:
 
 Same structure as subtask 3 but fixing issues flagged in subtask 4's comparison table. After fixes, loop back to subtask 4 to re-run failing cases until all pass.
 
-## Subtask 6 — Deploy to Local Docker
+## Subtask 6 — Deploy to Local Docker (Automated Smoke)
 
 **Assignee:** unassigned (Sub Agent)
 
 ```markdown
-**Role:** Senior Staff DevOps Engineer — expert in Docker builds, nginx, migrations
+**Role:** Senior Staff DevOps Engineer — expert in Docker builds, nginx, migrations, automated smoke testing
 
 **Context:**
 
@@ -272,58 +320,40 @@ Same structure as subtask 3 but fixing issues flagged in subtask 4's comparison 
 **Parent Task:** <PARENT-KEY>
 **Worktree / Branch:** see subtask 0
 
+**Purpose of this subtask:** automated smoke check that the feature boots cleanly in local Docker. **No human walkthrough** — this is a fast pre-architect-review / pre-sandbox gate that catches obvious "doesn't even start" failures before we burn architect-review or sandbox cycles. The human gates are on sandbox (subtask 10) and merge approval (subtask 12), not here.
+
 **Instructions:**
 
-1. From the worktree, run the local build command (whatever the team uses, e.g., `npm run build`, `make`, `cargo build`)
-2. Restart the relevant local services (e.g., `docker compose restart`, a systemd unit, or a `tilt up` reload)
+1. From the worktree, run the local build command (e.g., `npm run build`, `make`, `cargo build`)
+2. Restart the relevant local services (e.g., `docker compose restart`, `tilt up` reload)
 3. Verify database migrations have applied (check logs — migrations run on container boot, never manually)
-4. Confirm the feature is accessible at http://localhost (or correct URL)
-5. Post a Jira comment on THIS subtask with: build command run, container restart confirmation, migration status, URL where feature is live
+4. Verify the stack is healthy:
+   - Hit the health endpoint (e.g., `curl http://localhost/api/health`) — expect 200
+   - Hit the feature's primary URL (e.g., `curl -I http://localhost/feature`) — expect 200 or expected redirect
+   - Spot-check that core services in `docker compose ps` are all `Up` / `healthy`
+5. Post a Jira comment on THIS subtask with:
+   - Build command run + exit code
+   - Container restart confirmation + `docker compose ps` snippet
+   - Migration status (applied count / no pending)
+   - Health endpoint response
+   - Final line: `Local smoke PASS — ready for architect review (subtask 7).`
 
 **Acceptance Criteria:**
-- Build succeeds
-- Containers restart cleanly
+- Build succeeds (exit 0)
+- All relevant containers `Up`/`healthy`
 - Migrations applied (no pending ones)
-- Feature accessible at documented URL
+- Health endpoint returns 200
+- Feature URL reachable
+- No human walkthrough required — this is automated only
 ```
 
-## Subtask 7 — Manual Testing (human owner)
-
-**Assignee:** the parent Task's assignee (the human-in-the-loop owner of this Story). Default: `${user_config.default_owner_account_id}`.
-
-```markdown
-**Role:** The human-in-the-loop owner of this Story (the parent Task's assignee) — the only human checkpoint in the 11-step chain
-
-**Context:**
-
-[Full feature summary]
-
-**Parent Task:** <PARENT-KEY>
-
-**Manual test checklist:** see the Manual Test Cases section from subtask 1b's comment
-
-**Instructions:**
-
-1. Open http://localhost (Docker stack from subtask 6)
-2. Walk through EVERY case in the Manual Test Cases section
-3. Check each box as you verify (Jira markdown renders interactive checkboxes)
-4. For any issues, add a Jira comment with `Issue: [description]` and a screenshot
-5. If all cases pass: comment `Manual testing complete — all N cases passed` and transition subtask to Done
-6. If issues exist: DO NOT transition. Instead:
-   - Comment the issues
-   - Reassign subtask 5 (Fix UI Testing Issues) to loop back
-   - Re-test once it returns
-
-**Acceptance Criteria:**
-- Every Manual Test Case checkbox is checked
-- Any issues caught are fixed (looped through 5 → 6 → 7) before Done
-```
-
-## Subtask 8 — Senior Architect Review (Sub Agent)
+## Subtask 7 — Senior Architect Review (Sub Agent)
 
 **Assignee:** unassigned (Sub Agent)
 
 **Approach:** Dispatch via the **`jira-architect-review` skill** (preferred — right-sizes the review to the feature's diff and selects 3 / 5 / 7 / all 10 angles accordingly). Alternatively, `superpowers:code-reviewer` with the full 10-angle checklist as a fallback if `jira-architect-review` is unavailable. Pass the full parent Task spec + implementation plan + test plan + git diff as context; frame the agent as a senior enterprise architect reviewing for shipping risk.
+
+**Note on ordering:** this review runs BEFORE sandbox deploy (subtask 9). The architect reviews static diff + plans + local smoke result; sandbox runtime issues are caught downstream in subtasks 10–11. This ordering exists so we don't burn sandbox deploy cycles on code that fails architect review.
 
 ```markdown
 **Role:** Enterprise Architect — expert in multi-system production readiness reviews across the team's infrastructure. Distinct from subtask 2's code review: that was correctness-focused; this is shipping-risk focused.
@@ -335,14 +365,14 @@ Same structure as subtask 3 but fixing issues flagged in subtask 4's comparison 
 **Parent Task:** <PARENT-KEY>
 **Branch:** see subtask 0
 
-**Review angles (use as a pass/fail checklist — comment one subsection per angle):**
+**Review angles (use as a pass/fail checklist — comment one subsection per angle; `jira-architect-review` right-sizes to 3 / 5 / 7 / 10 angles based on diff size):**
 
 1. **Correctness vs spec** — does this actually do what the spec says? Any silent deviations?
 2. **Cross-system impact** — touches shared data, shared auth, multi-service dependencies? Are other systems safe?
 3. **Security** — auth paths, secrets, CORS, cookie scope, RBAC, new public endpoints?
 4. **Performance at prod scale** — will this slow the dashboard? unbounded queries? N+1?
-5. **Data integrity** — migration safety on prod data (real YTD data), FK cascades, rollback plan
-6. **Integration touchpoints** — AdvanceHQ, Azure, SharePoint, email, any third party
+5. **Data integrity** — migration safety on prod data, FK cascades, rollback plan
+6. **Integration touchpoints** — third-party APIs, queues, email, file storage, any external system
 7. **Auth flow** — login, session, permission checks, SSO across subdomains?
 8. **Rollback / kill switch** — if this breaks, can we revert quickly? Migration reversible?
 9. **Observability** — log levels, error tracking, audit log entries for mutations
@@ -352,70 +382,280 @@ Same structure as subtask 3 but fixing issues flagged in subtask 4's comparison 
 
 1. Check out the feature branch locally
 2. Review the diff end-to-end
-3. Post a Jira comment with pass/fail per angle (all 10)
-4. If any blocker → reassign sub-agent to fix, loop back through subtasks 4 → 5 → 6 → 7 → 8
-5. If all clear → transition subtask to Done. Subtask 9 proceeds.
+3. Post a Jira comment with pass/fail per angle (each finding categorized: BLOCKER / MAJOR / MINOR with file:line + suggested fix)
+4. If any BLOCKER or MAJOR exists → subtask 8 (Fix Architect Review) picks up; orchestrator loops 7 → 8 → 7 until clean (cap 3 cycles)
+5. If all clear → transition subtask to Done. Subtask 9 (Deploy to Sandbox) proceeds.
 
 **Acceptance Criteria:**
-- All 10 angles have a pass/fail in the comment
-- Any blockers are fixed and re-reviewed
-- Final comment ends with: "Architect review passed — cleared for prod"
+- All applicable angles have a pass/fail in the comment (right-sized per `jira-architect-review`)
+- Every finding has file:line + severity + description + suggested fix
+- Final comment ends with either: `Architect review PASSED — cleared for sandbox` OR `Architect review BLOCKED — see findings; subtask 8 to fix`
 ```
 
-## Subtask 9 — Push to Prod
+## Subtask 8 — Fix Architect Review Issues
 
 **Assignee:** unassigned (Sub Agent)
 
-> [!important] Open a PR. NEVER merge directly to main.
-> Subtask 9 must **open a pull request** to `main` and **wait for a human to click merge**. Direct pushes to `main` bypass the final-human-sanity step and erase GitHub's diff-review surface. The sub-agent's job is to prepare the PR cleanly (push branch → open PR with architect-recommended description → comment PR URL on the Jira subtask), then stop. The orchestrator pauses until the human merges — GitHub Actions takes over from there.
-
 ```markdown
-**Role:** Senior Staff Release Engineer — expert in git merges, production deployments, CI/CD, PR hygiene
+**Role:** Senior Staff Implementation Engineer — expert in applying architect review feedback at the systems level (security, perf, integration, rollback, observability)
 
 **Context:**
 
 [Full feature summary]
 
 **Parent Task:** <PARENT-KEY>
-**Branch:** see subtask 0
+**Worktree / Branch:** see subtask 0
 
 **Instructions:**
 
-1. Push the feature branch to origin (if not already pushed).
-2. Open a PR from the feature branch to `main` using `gh pr create` (or raw REST if `gh` is unavailable). The PR description MUST include:
-   - **Summary** of what's being shipped (pull from parent Task's spec section).
-   - **Bundled scope** subsection if the architect review (subtask 8) called out any out-of-scope commits bundled in this PR (e.g., infra/tech-debt fixes). Copy the architect's rationale verbatim.
-   - **Test plan** link/summary (from subtask 1b).
-   - **Rollback plan** — copy from architect review's "Rollback / kill switch" angle.
+1. Read subtask 7's comment — the full findings list with file:line + severity is there
+2. Fix every `[BLOCKER]` finding. Fix all `[MAJOR]` findings unless you have a justified reason to disagree (post that rationale on this subtask).
+3. For `[MINOR]` findings, fix where easy; otherwise defer with a one-line comment.
+4. Commit per-finding with messages like `fix(architect): <short description> (addresses <PARENT-KEY> finding #3)`.
+5. Push commits to the feature branch.
+6. Post a Jira comment on THIS subtask listing each finding and your resolution (fixed / deferred with reason / disagreed with rationale).
+7. Transition to Done. Orchestrator loops back to subtask 7 (Architect Review) to re-review the updated diff.
+
+**Acceptance Criteria:**
+- All `[BLOCKER]` findings resolved
+- `[MAJOR]` findings mostly resolved with per-finding comment for any deferred
+- All commits pushed
+- Comment posted with per-finding resolution log
+- Subtask transitioned to Done so orchestrator can re-run subtask 7
+```
+
+**Loop cap:** subtasks 7 ↔ 8 cycle max 3 times. After 3rd failed cycle, orchestrator escalates to the human owner.
+
+## Subtask 9 — Deploy to Sandbox
+
+**Assignee:** unassigned (Sub Agent)
+
+```markdown
+**Role:** Senior Staff Release Engineer — expert in multi-environment deploys, Terraform, Docker on remote hosts, sandbox/staging environments
+
+**Context:**
+
+[Full feature summary]
+
+**Parent Task:** <PARENT-KEY>
+**Worktree / Branch:** see subtask 0
+
+**Purpose:** deploy the feature branch to the team's sandbox environment so the human owner can manual-test on a real-deployed instance (subtask 10). The sandbox is the highest-fidelity pre-prod gate.
+
+**Sandbox environment quick-reference:** (defaults — verify against team's deploy-patterns doc / sandbox-vs-prod memory file)
+- Sandbox URLs are environment-specific (e.g., `*-sandbox.*` hosts, sandbox API hosts, sandbox infra subdomain)
+- Sandbox AWS account is separate from prod — use the sandbox AWS profile for any infra deploys
+- Sandbox branch `sandbox` is the release-train branch (used in subtask 12) — NOT the source for THIS deploy. This subtask deploys the feature branch directly to the sandbox env (image push / terraform apply against sandbox account), without merging anywhere yet.
+
+**Instructions:**
+
+1. Determine what the sandbox deploy looks like for this Component:
+   - **App services** (web apps, APIs, workers, auth, etc.): build image with feature-branch tag → push to sandbox container registry → SSH to sandbox host → `docker compose pull && docker compose up -d` for the affected services. Alternatively, the team's deploy script for sandbox.
+   - **Infrastructure** (terraform repos): change to the sandbox TF root (sibling to prod, e.g., `<repo>-sandbox/`) → `terraform plan -out=tfplan-<feature>` using the sandbox AWS profile → post the plan summary in a Jira comment → `terraform apply tfplan-<feature>`. Never run plan/apply with the prod profile.
+   - **Database migrations**: applied automatically by the container on boot (do not run them manually)
+2. Verify the deploy:
+   - Health endpoints respond on sandbox URL
+   - `docker ps` on sandbox host shows new image tag (or terraform output shows resources changed as expected)
+   - Sandbox logs show clean boot (no errors, migrations applied)
+3. Post a Jira comment on THIS subtask with:
+   - **Sandbox URL** — the exact URL the human reviewer will open in subtask 10 (e.g., `https://<feature>-sandbox.<domain>/...`)
+   - **Deploy summary** — image tag / terraform plan summary, services restarted
+   - **Health check** — endpoints hit + responses
+   - **Logs excerpt** — first 20 lines after restart, especially migration confirmation
+   - Final line: `Sandbox deploy PASS — ready for subtask 10 manual test.`
+
+**Acceptance Criteria:**
+- Sandbox URL is live and accessible
+- All affected services running new feature-branch artifact
+- No errors in sandbox logs post-restart
+- Migrations applied cleanly
+- Jira comment posted with sandbox URL prominently shown (subtask 10 reads it from here and substitutes into the embedded manual test cases)
+```
+
+## Subtask 10 — Sandbox Manual Testing (human owner)
+
+**Assignee:** the parent Task's assignee (the human-in-the-loop owner of this Story). Default: `${user_config.default_owner_account_id}`.
+
+**Human checkpoint:** this is the FIRST of two human gates in the chain. The other is subtask 12 (Merge to Sandbox Branch).
+
+```markdown
+**Role:** The human-in-the-loop owner of this Story (the parent Task's assignee) — testing the feature on the real-deployed sandbox environment
+
+**Context:**
+
+[Full feature summary]
+
+**Parent Task:** <PARENT-KEY>
+
+**Sandbox URL:** see subtask 9's completion comment (sub-agent posted the exact URL there)
+
+**Manual Test Cases (embedded — walk through every one):**
+
+[EMBED THE FULL Manual Test Cases SECTION HERE, verbatim from subtask 1b's comment. Each case must already follow the structured block format:
+- **What to test**
+- **Preconditions**
+- **How to test (numbered steps)**
+- **Expected output**
+- **Pass criteria** with checkbox
+
+Replace any `<sandbox-url>` placeholder in the embedded cases with the actual sandbox URL from subtask 9. The full block per case lets the reviewer walk through without opening any other doc.]
+
+**Instructions:**
+
+1. Open the sandbox URL from subtask 9
+2. Walk through EVERY Manual Test Case above
+3. For each case:
+   - Follow the "How to test" steps exactly
+   - Verify the "Expected output" matches what you see
+   - Check the pass-criteria box ☐ → ☑ if it matches
+   - Capture a screenshot at the result step (attach to this subtask)
+4. If all cases pass: comment `Sandbox manual testing complete — all N cases passed` and transition this subtask to Done
+5. If issues exist: DO NOT transition. Instead:
+   - Comment `Issue: [description]` per failing case (with screenshot)
+   - Orchestrator picks up subtask 11 (Fix Sandbox Issues) — the loop 11 → 9 → 10 re-runs
+
+**Acceptance Criteria:**
+- Every Manual Test Case checkbox is checked
+- Screenshot attached for each case (or at least each failing case)
+- Any issues caught are fixed (looped through 11 → 9 → 10) before Done
+- Transitioning to Done is the human reviewer's signal: "this feature works as spec on a real-deployed instance"
+```
+
+## Subtask 11 — Fix Sandbox Issues
+
+**Assignee:** unassigned (Sub Agent)
+
+```markdown
+**Role:** Senior Staff Implementation Engineer — expert in fixing issues caught during integration testing on a real-deployed environment
+
+**Context:**
+
+[Full feature summary]
+
+**Parent Task:** <PARENT-KEY>
+**Worktree / Branch:** see subtask 0
+
+**Instructions:**
+
+1. Read subtask 10's `Issue: ...` comments and screenshots — each represents a failed manual test case
+2. Reproduce each issue locally if possible (in the worktree)
+3. Fix each issue; commit per-issue with `fix(sandbox): <short description> (addresses <PARENT-KEY> sandbox issue from subtask 10)`
+4. Push commits to the feature branch
+5. Post a Jira comment on THIS subtask listing each issue and the fix (file:line + commit hash)
+6. Transition to Done. Orchestrator loops back to subtask 9 (Deploy to Sandbox) to re-deploy the fixed branch, then subtask 10 (Sandbox Manual Test) for the human reviewer to re-test.
+
+**Acceptance Criteria:**
+- Every issue from subtask 10 has a corresponding fix commit
+- All commits pushed
+- Comment posted with per-issue resolution log
+- Subtask transitioned to Done so the 9 → 10 cycle re-runs
+```
+
+**Loop cap:** subtasks 9 → 10 → 11 cycle max 3 times. After 3rd failed cycle, orchestrator escalates to the human owner.
+
+## Subtask 12 — Merge to Sandbox Branch (human approval)
+
+**Assignee:** the parent Task's assignee (the human-in-the-loop owner of this Story). Default: `${user_config.default_owner_account_id}`.
+
+**Human checkpoint:** this is the SECOND human gate in the chain. By approving here, the human owner is saying: "the feature works on sandbox — promote it to the sandbox branch (release train), and let it flow to prod next."
+
+```markdown
+**Role:** The human-in-the-loop owner of this Story — final approval before the feature joins the release train
+
+**Context:**
+
+[Full feature summary]
+
+**Parent Task:** <PARENT-KEY>
+**Feature branch:** see subtask 0
+**Sandbox branch:** `sandbox` (the release-train branch — feature PRs here first, then a separate PR sandbox → main ships it)
+
+**Instructions:**
+
+1. Review subtask 10's pass log (all manual cases passed) and subtask 7's architect review summary
+2. If satisfied, comment on THIS subtask with the explicit green light: `Approved — merge to sandbox branch`
+3. Sub-agent takes over once it sees that comment:
+   - Opens PR `feat/<PARENT-KEY>-<slug>` → `sandbox`
+   - Posts PR URL on this subtask
+   - Waits for the PR to merge (CI checks + auto-merge, or you click merge — your call)
+4. After the PR merges to `sandbox` branch:
+   - Sub-agent posts merge commit hash on this subtask
+   - Subtask transitions to Done
+   - Orchestrator proceeds to subtask 13 (Push to Prod = PR sandbox → main)
+
+**Why this gate exists:**
+
+- The `sandbox` branch is the integration buffer — anything merged here is "stable enough to be in line for prod"
+- Explicit `Approved` is the audit-trail signal that the feature passed both sandbox manual test AND architect review, and is intentionally being promoted
+- Bypass this gate only with `OVERRIDE — ship hot to main` phrasing (very rare, e.g., active prod incident)
+
+**Acceptance Criteria:**
+- Comment with explicit `Approved — merge to sandbox branch` (or override phrasing)
+- PR feature → sandbox opened by sub-agent, URL posted
+- PR merged
+- Merge commit hash posted on this subtask
+- Subtask transitioned to Done
+```
+
+## Subtask 13 — Push to Prod (sandbox → main)
+
+**Assignee:** unassigned (Sub Agent)
+
+> [!important] Open a PR from `sandbox` → `main`. NEVER merge directly to main.
+> Subtask 13 must **open a pull request** from `sandbox` to `main` and **wait for a human to click merge**. Direct pushes to `main` bypass the final-human-sanity step and erase GitHub's diff-review surface. The sub-agent's job is to prepare the PR cleanly (post PR description with architect review summary + sandbox manual-test results, comment PR URL on the Jira subtask), then stop. The orchestrator pauses until the human merges — GitHub Actions / Terraform takes over deployment from there.
+
+```markdown
+**Role:** Senior Staff Release Engineer — expert in git merges, production deployments, CI/CD, PR hygiene, release trains
+
+**Context:**
+
+[Full feature summary]
+
+**Parent Task:** <PARENT-KEY>
+**Source branch:** `sandbox` (the release-train branch; feature was merged here in subtask 12)
+**Target branch:** `main` (production)
+
+**Instructions:**
+
+1. Verify `sandbox` is ahead of `main` and contains the feature merge from subtask 12.
+2. Open a PR from `sandbox` to `main` using `gh pr create` (or raw REST if `gh` is unavailable). The PR description MUST include:
+   - **Summary** of what's being shipped (pull from parent Task's spec section)
+   - **Release train manifest:** if other commits are riding along on sandbox (other features merged earlier), list them — be explicit about EVERYTHING that's shipping in this PR, not just <PARENT-KEY>
+   - **Bundled scope** subsection if architect review (subtask 7) flagged out-of-scope commits
+   - **Test plan** link/summary (from subtask 1b) + sandbox manual test results (from subtask 10)
+   - **Rollback plan** — copy from architect review's "Rollback / kill switch" angle
 3. Post a Jira comment on THIS subtask with:
    - PR URL
-   - Target branch (`main`)
+   - Source/target (`sandbox → main`)
+   - Release-train manifest (list of features riding along, with their PARENT-KEYs)
    - Final line: `Waiting for human merge.`
 4. Do NOT transition this subtask to Done yet. Leave at `In Progress` until the human merges and the orchestrator verifies the deploy succeeded.
 
 **After the human merges (orchestrator — not this sub-agent):**
 
-1. Detect merge via `gh pr view --json state,mergeCommit` or by checking the commit on `main`.
-2. Monitor GitHub Actions deploy run.
-3. Confirm deploy succeeded (API container restarted, migrations applied, feature accessible on prod URL).
-4. Post a Jira comment with: merge commit hash, deploy log excerpt, timestamp, prod URL.
-5. Transition the subtask to Done.
+1. Detect merge via `gh pr view --json state,mergeCommit` or by checking the commit on `main`
+2. Monitor GitHub Actions deploy run (or terraform apply for infra)
+3. Confirm deploy succeeded (containers restarted, migrations applied, feature accessible on prod URL)
+4. Post a Jira comment with: merge commit hash, deploy log excerpt, timestamp, prod URL
+5. Transition the subtask to Done
 
 **Acceptance Criteria:**
-- PR opened with correct description (Summary + Bundled scope + Test plan + Rollback)
+- PR opened sandbox → main with correct description (Summary + Release train manifest + Bundled scope + Test plan + Sandbox results + Rollback)
 - PR URL posted on Jira subtask
 - Subtask stays `In Progress` until human merges and orchestrator confirms deploy
 - After merge: deploy verified, comment posted with commit hash + prod URL, subtask transitioned to Done
 ```
+
+**Release-train note:** because `sandbox` is now the integration branch, multiple features may merge to `sandbox` before any one of them reaches prod. When subtask 13 opens its PR, the diff may include features from OTHER Stories. The "Release train manifest" line in the PR description makes this explicit so prod reviewers know exactly what's shipping. Per-Story Jira tickets remain the source of truth for each feature's history; the PR is the release-train snapshot.
 
 **Why PR-not-direct-merge is non-negotiable:**
 
 - Final human sanity check on the diff before prod
 - GitHub's PR review UI surfaces changes differently than local `git diff` — reviewers catch things the chain missed
 - The PR record is the audit trail — "who approved this prod change" is unambiguous
-- If the architect review flagged bundled-scope commits, the PR description makes them visible to anyone not in the chain
+- The release-train PR description is the single place that lists everything shipping in this prod cut
 
-## Subtask 10 — Prod Sanity Test
+## Subtask 14 — Prod Sanity Test
 
 **Assignee:** unassigned (Sub Agent)
 

@@ -260,7 +260,7 @@ Then print a green-check summary:
 >
 > After restart, try any of:
 >   • `design WFR-42` — scope a feature end-to-end (invokes jira-story-design)
->   • `pick up WFR-42` — execute the 11-subtask chain (invokes jira-story-execute)
+>   • `pick up WFR-42` — execute the 15-subtask chain, with sandbox + merge approval gates (invokes jira-story-execute)
 >   • `review this change for shipping` — run the architect review (invokes jira-architect-review)"
 
 ## One-time Jira project prep (offer at the end)

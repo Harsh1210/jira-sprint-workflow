@@ -5,7 +5,7 @@ description: Design a feature end-to-end in Jira — brainstorm, write spec, wri
 
 # Jira Story Design
 
-This skill orchestrates end-to-end Phase 1 of a sprint workflow: taking a one-line intake Task in Jira and turning it into a fully-designed set of 11 execution subtasks that any teammate or sub-agent can pick up and run.
+This skill orchestrates end-to-end Phase 1 of a sprint workflow: taking a one-line intake Task in Jira and turning it into a fully-designed set of 15 execution subtasks that any teammate or sub-agent can pick up and run.
 
 ## Core principle: Jira self-containment
 
@@ -63,10 +63,31 @@ If the user hasn't told you which Jira task, ask. You need a specific parent Tas
 4. Invoke superpowers:writing-plans ──────► produces plans and test-plan files
 5. Run plan-document-reviewer loop ───────► fix issues per chunk, re-review until clean
 6. Confirm assignee ──────────────────────► default from user_config; confirm if different
-7. Create 11 self-contained subtasks ─────► 0, 1, 1b, 2, 3, 4, 5, 6, 7, 8, 9, 10
+7. Create 15 self-contained subtasks ─────► 0, 1, 1b, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
 8. Wire "is blocked by" chain links ──────► enforce execution order in Jira
 9. Transition parent Task to "Selected for Development" (or your team's equivalent)
 10. Verify the board looks right ─────────► every subtask has content, links, assignee
+```
+
+### Chain shape (15 subtasks; 2 human gates)
+
+```
+0   Setup Branch & Worktree
+1   Implement Feature            ┐
+1b  Plan Functional Test Cases   ┘ (parallel with 1)
+2   Code Review                  ┐
+3   Fix Code Review              ┘ (loop, cap 3)
+4   UI Testing                   ┐
+5   Fix UI Testing               ┘ (loop, cap 3)
+6   Deploy to Local Docker (automated smoke — no human)
+7   Senior Architect Review      ┐
+8   Fix Architect Review         ┘ (loop, cap 3)
+9   Deploy to Sandbox
+10  Sandbox Manual Testing ✋    ┐ (HUMAN gate #1)
+11  Fix Sandbox Issues           ┘ (loop, cap 3 cycling 11→9→10)
+12  Merge to Sandbox Branch ✋   (HUMAN gate #2 — approval to join release train)
+13  Push to Prod (sandbox → main PR)
+14  Prod Sanity Test
 ```
 
 Each step has enforcement rules in the next sections.
@@ -103,22 +124,22 @@ Dispatch `plan-document-reviewer` agents in parallel per chunk. Fix issues they 
 
 ### Step 6 — Confirm ownership
 
-The parent Task stays assigned to the human-in-the-loop owner. Subtask 7 (Manual Testing) gets the SAME assignee as the parent (the human who owns the Story walks the manual test). Everything else is unassigned (Sub Agent).
+The parent Task stays assigned to the human-in-the-loop owner. The two human-gate subtasks (#10 Sandbox Manual Test, #12 Merge to Sandbox Branch) get the SAME assignee as the parent. Everything else is unassigned (Sub Agent).
 
-**Default:** both parent Task and subtask 7 assigned to `${user_config.default_owner_account_id}`.
+**Default:** parent Task + subtask 10 + subtask 12 all assigned to `${user_config.default_owner_account_id}`.
 
 Only ask the user if the owner is different this time (e.g., a teammate is taking this Story).
 
-### Step 7 — Create the 11 subtasks
+### Step 7 — Create the 15 subtasks
 
-Read `references/subtask-templates.md` for the role description, instructions, and acceptance criteria for each of the 11 subtasks. For each subtask:
+Read `references/subtask-templates.md` for the role description, instructions, and acceptance criteria for each of the 15 subtasks. For each subtask:
 - Create via `mcp__claude_ai_Atlassian_Rovo__createJiraIssue` with `parent: "<TASK-KEY>"` and `issueTypeName: "Sub-task"` (or `Subtask` — verify with `getJiraProjectIssueTypesMetadata`)
 - Description must be fully self-contained (include role + context summary + subtask-specific content + acceptance criteria). Use `references/subtask-templates.md`.
 - Set assignee per the rules in "Assignee convention" below
 - Set Component + Priority explicitly (don't rely on parent inheritance — Jira is inconsistent on Sub-tasks)
 
 > [!warning] Jira inherits the parent's assignee on subtask creation
-> If you don't pass `assignee_account_id` explicitly, the new subtask will be assigned to whoever owns the parent. Since our convention has only ONE human-assigned subtask (#7), this is a trap — all other subtasks end up incorrectly owned. Either:
+> If you don't pass `assignee_account_id` explicitly, the new subtask will be assigned to whoever owns the parent. Since our convention has only TWO human-assigned subtasks (#10 Sandbox Manual Test, #12 Merge to Sandbox Branch), this is a trap — all other subtasks end up incorrectly owned. Either:
 > 1. Pass `assignee_account_id: null` on every Sub Agent subtask's create call, OR
 > 2. After creation, PUT `/rest/api/3/issue/<key>/assignee` with `{accountId: null}` for each Sub Agent subtask.
 >
@@ -129,19 +150,28 @@ Read `references/subtask-templates.md` for the role description, instructions, a
 Use `mcp__claude_ai_Atlassian_Rovo__createIssueLink` (or raw REST `POST /rest/api/3/issueLink`) to create "is blocked by" relationships:
 
 ```
-0 → (nothing; first subtask)
-1 → blocked by 0
+0  → (nothing; first subtask)
+1  → blocked by 0
 1b → blocked by 0 (parallel with 1)
-2 → blocked by 1
-3 → blocked by 2
-4 → blocked by 3 AND 1b
-5 → blocked by 4
-6 → blocked by 5
-7 → blocked by 6
-8 → blocked by 7
-9 → blocked by 8
-10 → blocked by 9
+2  → blocked by 1
+3  → blocked by 2
+4  → blocked by 3 AND 1b
+5  → blocked by 4
+6  → blocked by 5
+7  → blocked by 6                  (Architect Review)
+8  → blocked by 7                  (Fix Architect)
+9  → blocked by 7                  (Deploy to Sandbox — after architect clears, may follow 7 directly or after 8 if a fix cycle ran)
+10 → blocked by 9                  (Sandbox Manual Test — HUMAN)
+11 → blocked by 10                 (Fix Sandbox — only used if subtask 10 reports issues)
+12 → blocked by 10                 (Merge to Sandbox Branch — HUMAN approval)
+13 → blocked by 12                 (Push to Prod)
+14 → blocked by 13                 (Prod Sanity)
 ```
+
+> [!note] Subtask 9's predecessor depends on whether the architect-review loop fired
+> Wire `9 ← 7` at creation time. If the orchestrator loops through 8 → 7 (fix cycle), the link still gates correctly because 7 must reach Done before 9 starts. Don't wire `9 ← 8` — that breaks the no-fix-needed happy path where 8 never runs.
+>
+> Same pattern: wire `12 ← 10` and `13 ← 12` at creation; 11 is only inserted into the chain when 10 reports issues (orchestrator handles the loop dynamically).
 
 If `createIssueLink` rejects a link type name, check with `getIssueLinkTypes`.
 
@@ -168,23 +198,28 @@ Use `mcp__claude_ai_Atlassian_Rovo__getTransitionsForJiraIssue` to find the tran
 ### Step 10 — Verify the board
 
 Before reporting success:
-- Re-fetch the parent Task and all 11 subtasks via `getJiraIssue`
-- Confirm each has: description, assignee (per rules), component, priority, and the right blocking links (12 total)
+- Re-fetch the parent Task and all 15 subtasks via `getJiraIssue`
+- Confirm each has: description, assignee (per rules), component, priority, and the right blocking links (16 total — see the block-by chain in Step 8; 4 has two predecessors (3 and 1b), 9 follows 7 directly, and 11/12 both branch from 10)
 - Report back to the user with: parent Task URL, subtask count, assignee assignments, any fields still needing manual attention
 
 ## Assignee convention
 
-One human checkpoint in the chain. Everything else is Sub Agent work.
+Two human checkpoints in the chain. Everything else is Sub Agent work.
 
 | Issue | Assignee |
 |---|---|
 | Parent Task | The human-in-the-loop owner of the Story (default: `${user_config.default_owner_account_id}`) |
-| Subtask 7 (Manual Testing) | Same as the parent Task's assignee |
-| All other subtasks (0, 1, 1b, 2, 3, 4, 5, 6, 8, 9, 10) | Unassigned (= Sub Agent) |
+| Subtask 10 (Sandbox Manual Testing) | Same as the parent Task's assignee |
+| Subtask 12 (Merge to Sandbox Branch) | Same as the parent Task's assignee |
+| All other subtasks (0, 1, 1b, 2, 3, 4, 5, 6, 7, 8, 9, 11, 13, 14) | Unassigned (= Sub Agent) |
 
 Unassigned means "Sub Agent picks it up autonomously." It's not a bug, it's the signal.
 
-**Subtask 8 (Architect Review) is Sub Agent-driven** via `superpowers:code-reviewer` or a focused review subagent with the full spec + plan + diff as context. The sub-agent plays a senior enterprise architect reviewing for shipping risk. The human owner already signed off on UX in subtask 7; the architect review covers everything else (security, perf, cross-system, rollback, data integrity, etc.).
+**Subtask 7 (Architect Review) is Sub Agent-driven** via `jira-architect-review` (preferred — right-sizes the review) or `superpowers:code-reviewer` as a fallback. The sub-agent plays a senior enterprise architect reviewing for shipping risk. The architect review runs BEFORE sandbox deploy — it gates whether the diff is even worth deploying to sandbox.
+
+**Subtask 10 (Sandbox Manual Test)** is the integration gate — the human reviewer validates the feature on a real-deployed sandbox environment using the structured manual test cases (What / Preconditions / How / Expected / Pass criteria) that subtask 1b produced.
+
+**Subtask 12 (Merge to Sandbox Branch)** is the release-train approval gate — the human's explicit `Approved — merge to sandbox branch` comment authorizes the sub-agent to PR feature → sandbox and merge.
 
 ## Components and priority
 
@@ -204,7 +239,7 @@ If your team's workflow requires Stories specifically, you can convert via `edit
 - Don't put `see plans/...` in a subtask description without also embedding the content. Jira content must stand alone within size limits.
 - Don't create subtasks without the "is blocked by" links. The chain ordering is what makes sub-agent execution safe.
 - Don't leave Component, Priority, or Assignee blank. Prompt the user if you don't know.
-- Don't transition the parent Task until all 11 subtasks exist with content, assignees, and links.
+- Don't transition the parent Task until all 15 subtasks exist with content, assignees, and links.
 - Don't merge subtasks 1 and 1b into one. They run in parallel by design — the test plan must be written by a different brain than the implementation.
 - Don't trust `createJiraIssue` to respect your intent — Jira silently inherits parent fields (assignee especially). Always re-fetch and verify every field.
 - Don't batch `createIssueLink` calls without verifying direction on the first one.
@@ -215,8 +250,9 @@ Jira Cloud enforces a practical description limit of ~32KB. A full implementatio
 
 - **Parent Task description** — summary-level: Original Feedback, Investigation, Requirements checklist, Design/Spec (full), Implementation Plan Summary (chunk titles only), Test Plan Summary (counts), Dependencies, Out of Scope, Open Questions. Reference the plan/test-plan file paths.
 - **Subtask 1 (Implement)** — plan outline (chunk titles + task-level file paths) + key code snippets (schema, core interfaces) + pointer to the plan file for full per-step code. The sub-agent executing this subtask reads BOTH Jira + the file.
-- **Subtask 1b (Test Cases)** — the full test plan usually fits (~15KB). Embed the complete Automated + Manual sections directly. Also mirror as a Jira comment.
-- **Other subtasks (2, 3, 4, 5, 6, 7, 8, 9, 10)** — fit comfortably (~2-12KB each). Embed role, context, checklist/framework, acceptance criteria in full.
+- **Subtask 1b (Test Cases)** — the full test plan usually fits (~15KB). Embed the complete Automated + Manual sections directly. Manual cases must follow the structured block format (What / Preconditions / How / Expected / Pass criteria). Also mirror as a Jira comment so subtasks 4, 10, and 14 can read it without opening the repo.
+- **Subtask 10 (Sandbox Manual Test)** — embeds the full Manual Test Cases blocks from 1b, with `<sandbox-url>` placeholder substituted with the actual URL from subtask 9's comment. This is the only subtask with embedded human-readable test steps.
+- **Other subtasks (2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14)** — fit comfortably (~2–12KB each). Embed role, context, checklist/framework, acceptance criteria in full.
 
 If a description exceeds the limit, the API returns 400 with a body-size error. When that happens, trim the plan outline (drop code snippets) rather than sacrificing structure.
 
@@ -229,7 +265,7 @@ If a description exceeds the limit, the API returns 400 with a body-size error. 
 ## References
 
 - `references/story-description-template.md` — parent Task description markdown template
-- `references/subtask-templates.md` — role, instructions, and acceptance criteria for each of the 11 subtasks
+- `references/subtask-templates.md` — role, instructions, and acceptance criteria for each of the 15 subtasks
 - `references/jira-api-patterns.md` — example MCP tool calls for create, edit, link, transition, and REST fallback patterns
 
 Read these when you reach the relevant step. Don't load them up-front.
@@ -241,6 +277,7 @@ Read these when you reach the relevant step. Don't load them up-front.
 - `plan-document-reviewer` — dispatch in step 5
 - `superpowers:using-git-worktrees` — referenced by subtask 0's execution (runs in Phase 2, not here)
 - `superpowers:subagent-driven-development` — referenced by subtask 1's execution
-- `superpowers:code-reviewer` — referenced by subtask 8's execution
+- `jira-architect-review` — preferred sub-agent for subtask 7's execution (right-sizes the review)
+- `superpowers:code-reviewer` — fallback for subtask 7's execution if `jira-architect-review` is unavailable
 
 This skill handles Phase 1 (design). Phase 2 (execute) and per-subtask execution are separate skills (see the plugin's other skills if added).

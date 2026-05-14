@@ -1,7 +1,7 @@
 {
   "name": "jira-sprint-workflow",
-  "version": "0.6.0",
-  "description": "End-to-end Jira sprint workflow for Claude Code teams. Four skills: (1) jira-setup — guided first-time setup that walks users through API token generation, auto-discovers account ID and projects, and validates live against Jira; (2) jira-story-design — brainstorms a feature, embeds the spec in Jira, generates an implementation plan, and creates 11 self-contained subtasks; (3) jira-story-execute — autonomously walks the chain to Done, pausing only at the human manual-test checkpoint, with full resumability from Jira state; (4) jira-architect-review — right-sized production-readiness review (3 / 5 / 7 / 10 angles based on the diff) at subtask 8 or any time a change needs shipping-risk assessment. The design/execute/review skills all gate on config and hand off to jira-setup automatically if any value is missing.",
+  "version": "0.7.0",
+  "description": "End-to-end Jira sprint workflow for Claude Code teams with a sandbox staging gate before prod. Four skills: (1) jira-setup — guided first-time setup that walks users through API token generation, auto-discovers account ID and projects, and validates live against Jira; (2) jira-story-design — brainstorms a feature, embeds the spec in Jira, generates an implementation plan, and creates 15 self-contained subtasks (Setup → Implement ∥ Test Cases → Code Review → Fix → UI Test → Fix → Local Smoke → Architect Review → Fix → Deploy to Sandbox → Sandbox Manual Test [human] → Fix → Merge to Sandbox Branch [human] → Push to Prod → Prod Sanity); (3) jira-story-execute — autonomously walks the 15-subtask chain to Done, pausing at two human checkpoints (sandbox manual test, merge approval), with full resumability from Jira state; (4) jira-architect-review — right-sized production-readiness review (3 / 5 / 7 / 10 angles based on the diff) at subtask 7 (pre-sandbox) or any time a change needs shipping-risk assessment. The design/execute/review skills all gate on config and hand off to jira-setup automatically if any value is missing.",
   "author": {
     "name": "Harsh Agarwal",
     "email": "harsh12101998@gmail.com"
@@ -35,7 +35,7 @@
     "default_owner_account_id": {
       "type": "string",
       "title": "Default Owner Account ID",
-      "description": "Default assignee for parent Tasks and Subtask 7 (Manual Testing). Use Jira account ID, not email. Find yours at https://<your-jira>.atlassian.net/rest/api/3/myself"
+      "description": "Default assignee for parent Tasks and the two human-gate subtasks: 10 (Sandbox Manual Testing) and 12 (Merge to Sandbox Branch). Use Jira account ID, not email. Find yours at https://<your-jira>.atlassian.net/rest/api/3/myself"
     },
     "components": {
       "type": "string",
