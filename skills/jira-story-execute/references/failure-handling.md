@@ -49,11 +49,14 @@ Same shape for 4 ↔ 5.
 ## Escalation triggers (skill exits immediately)
 
 - Sub-agent returns `VERDICT: BLOCKED` with a blocker description
-- Fix loop exceeds 3 cycles on the same pair
+- Fix loop exceeds 3 cycles on the same pair (2↔3, 4↔5, 7↔8, or 9→10→11)
 - Atlassian MCP or Jira API errors for more than 2 consecutive attempts
-- Subtask 7 reached (human checkpoint — this is "normal" escalation, not a failure)
-- Subtask 8 (Architect Review) returns any `Block` verdict on its 10 angles
+- Subtask 10 reached (human checkpoint #1 — Sandbox Manual Test; "normal" escalation, not a failure)
+- Subtask 12 reached (human checkpoint #2 — Merge to Sandbox Branch; "normal" escalation, not a failure)
+- Subtask 7 (Architect Review) returns any `Block` verdict on its angles (orchestrator dispatches subtask 8 to fix, then loops)
+- Subtask 13 PR sandbox → main needs the human to click merge (this is not an error — orchestrator waits)
 - Git operations fail (merge conflicts, push rejected, missing remote)
+- Terraform apply in subtask 9 (sandbox) fails with non-trivial errors (e.g., permission denied, conflicting resources, IAM drift)
 
 ## Resumption after escalation
 
@@ -91,20 +94,24 @@ Every operation the skill (or sub-agents) perform should be safe to retry:
 | Create git branch | `git branch -M main` is idempotent; `git checkout -b <branch>` will fail if the branch exists — use `git checkout <branch> 2>/dev/null || git checkout -b <branch>` |
 | `npm install` / `bun install` | Idempotent by design |
 | Docker restart | Idempotent |
-| Merge to main (subtask 9) | Use `git merge --no-ff`; if already merged, the command is a no-op |
+| Merge feature → sandbox (subtask 12) | Use `gh pr merge --merge` or `git merge --no-ff`; if already merged, the command is a no-op |
+| Merge sandbox → main (subtask 13, after human clicks merge on the PR) | Detect via `gh pr view --json state,mergeCommit`; do not re-merge |
+| Sandbox terraform apply (subtask 9) | Use saved tfplan; if `terraform apply` finishes once, re-running with same state is a no-op |
 
 ## When in doubt, escalate
 
 The bias of this system is to escalate rather than guess. The user's time is worth more than one unnecessary escalation. If a sub-agent is uncertain about how to proceed, or if the orchestrator sees inconsistent Jira state (e.g., a subtask marked Done but no Completed comment), pause and ask.
 
-## Skipping fix subtasks (3 and 5) when there's nothing to fix
+## Skipping fix subtasks (3, 5, 8, 11) when there's nothing to fix
 
 If the main subtask returns cleanly with no findings/failures, the paired fix subtask has no work. Don't dispatch a sub-agent for it — that wastes tokens on a no-op.
 
 - **Subtask 2 (Code Review) returns 0 BLOCKER + 0 MAJOR findings** → skip subtask 3. Orchestrator posts `Skipped: subtask 2 returned 0 blockers / 0 majors — no fixes required.` on subtask 3 and transitions it to Done directly.
-- **Subtask 4 (UI Testing) returns all PASS** → skip subtask 5. Orchestrator posts `Skipped: subtask 4 returned 18/18 PASS — no UI fixes required.` on subtask 5 and transitions it to Done directly.
+- **Subtask 4 (UI Testing) returns all PASS** → skip subtask 5. Orchestrator posts `Skipped: subtask 4 returned all PASS — no UI fixes required.` on subtask 5 and transitions it to Done directly.
+- **Subtask 7 (Architect Review) returns 0 BLOCKER + 0 MAJOR findings** → skip subtask 8. Orchestrator posts `Skipped: subtask 7 returned 0 blockers / 0 majors — no architect fixes required.` on subtask 8 and transitions it to Done directly.
+- **Subtask 10 (Sandbox Manual Test) is transitioned to Done by the human with no `Issue: ...` comments** → skip subtask 11. Orchestrator posts `Skipped: subtask 10 passed without issues — no sandbox fixes required.` on subtask 11 and transitions it to Done directly.
 
-In both cases, the orchestrator's next action is to advance to the subtask after the fix (i.e., 4 after skipping 3, or 6 after skipping 5). This was validated on the first live run: WFR-20 was skipped when WFR-19 cycle 2 returned 18/18 PASS, and the chain proceeded directly to WFR-21.
+In all cases, the orchestrator's next action is to advance to the subtask after the fix (i.e., 4 after skipping 3, 6 after skipping 5, 9 after skipping 8, 12 after skipping 11). This pattern was validated on the first live run: WFR-20 was skipped when WFR-19 cycle 2 returned 18/18 PASS, and the chain proceeded directly to WFR-21.
 
 ## Pre-existing bugs discovered mid-chain
 
@@ -113,7 +120,7 @@ A sub-agent sometimes discovers a bug unrelated to the Story's scope but blockin
 1. **Fix inline + flag for architect review** (default for small, defensive fixes)
    - Orchestrator acknowledges the discovery, produces a minimal fix on the feature branch
    - The fix gets its own commit with a clear `chore:` prefix and message explaining it's tech-debt adjacent to the feature
-   - Subtask 8 (Architect Review) explicitly evaluates the "bundled-scope commits" decision: bundle with the Story's PR (with callout in the PR description) vs cherry-pick to a separate PR
+   - Subtask 7 (Architect Review) explicitly evaluates the "bundled-scope commits" decision: bundle with the Story's PR (with callout in the PR description) vs cherry-pick to a separate PR
    - Validated on WFR-5: bootstrap-migrations.ts drift was fixed inline, bundled with the Story's PR per architect recommendation
 
 2. **Escalate and open a separate Jira task** (for larger fixes or scope-creep risks)

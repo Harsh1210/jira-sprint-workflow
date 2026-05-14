@@ -43,7 +43,7 @@ mcp__claude_ai_Atlassian_Rovo__createJiraIssue
   additional_fields:
     components: [{ name: "<ComponentName>" }]  // from ${user_config.components}
     priority: { name: "High" }
-  assignee_account_id: null     # unassigned (Sub Agent); for subtask 7, use ${user_config.default_owner_account_id} or the parent Task's assignee
+  assignee_account_id: null     # unassigned (Sub Agent); for subtasks 10 (Sandbox Manual Test) and 12 (Merge to Sandbox Branch), use ${user_config.default_owner_account_id} or the parent Task's assignee
 ```
 
 ### Link two subtasks with "is blocked by"
@@ -230,11 +230,11 @@ Confirm for each issue:
 - [ ] Parent Task assignee = the human-in-the-loop owner (${user_config.default_owner_account_id})
 - [ ] Parent Task has Component (CRM etc.) and Priority (Highest/High/Medium/Low) set
 - [ ] Parent Task description covers all 9 sections from `story-description-template.md`
-- [ ] 11 subtasks exist (summaries: `0. Setup Branch & Worktree`, `1. Implement Feature`, `1b. Plan Functional Test Cases (parallel with #1)`, `2. Code Review`, `3. Fix Code Review Issues`, `4. UI Testing`, `5. Fix UI Testing Issues`, `6. Deploy to Local Docker`, `7. Manual Testing`, `8. Senior Architect Review`, `9. Push to Prod`, `10. Prod Sanity Test`)
-- [ ] Subtask 7 assigned to the parent Task's assignee; ALL other subtasks unassigned (explicit `null`)
+- [ ] 15 subtasks exist (summaries: `0. Setup Branch & Worktree`, `1. Implement Feature`, `1b. Plan Functional Test Cases (parallel with #1)`, `2. Code Review`, `3. Fix Code Review Issues`, `4. UI Testing`, `5. Fix UI Testing Issues`, `6. Deploy to Local Docker (Automated Smoke)`, `7. Senior Architect Review`, `8. Fix Architect Review Issues`, `9. Deploy to Sandbox`, `10. Sandbox Manual Testing`, `11. Fix Sandbox Issues`, `12. Merge to Sandbox Branch`, `13. Push to Prod`, `14. Prod Sanity Test`)
+- [ ] Subtasks 10 AND 12 assigned to the parent Task's assignee; ALL other subtasks unassigned (explicit `null`)
 - [ ] Every subtask has role + context + subtask-specific instructions + acceptance criteria
 - [ ] Every subtask has Component and Priority set (don't rely on parent inheritance — Jira is unreliable here for Sub-tasks)
 - [ ] "Is blocked by" chain correct — verify direction on one link before trusting the rest
-- [ ] 12 total links exist: 0→1, 0→1b, 1→2, 2→3, 3→4, 1b→4, 4→5, 5→6, 6→7, 7→8, 8→9, 9→10
+- [ ] 16 total links exist: 0→1, 0→1b, 1→2, 2→3, 3→4, 1b→4, 4→5, 5→6, 6→7, 7→8, 7→9, 9→10, 10→11, 10→12, 12→13, 13→14
 
 If anything is missing or wrong, fix before reporting complete.

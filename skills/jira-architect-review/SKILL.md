@@ -1,11 +1,11 @@
 ---
 name: jira-architect-review
-description: Perform a right-sized enterprise architect review on a feature branch for a Jira Story — autodetects feature size from the diff and applies the matching review checklist (3 angles for minor fixes, 5 for small features, 7 for medium, all 10 for large / framework-level changes). Use whenever the user says "review this branch", "architect review", "prod readiness review", or whenever subtask 8 of the jira-sprint-workflow chain fires. The sub-dispatched reviewer scales effort to the change — a 3-line typo fix does not need a 10-angle audit, and a 3000-line framework change should not get a 2-angle rubber stamp. Output is a categorized Jira comment with pass/block per angle plus a bundled-scope decision if out-of-scope commits rode along.
+description: Perform a right-sized enterprise architect review on a feature branch for a Jira Story — autodetects feature size from the diff and applies the matching review checklist (3 angles for minor fixes, 5 for small features, 7 for medium, all 10 for large / framework-level changes). Use whenever the user says "review this branch", "architect review", "prod readiness review", or whenever subtask 7 of the jira-sprint-workflow chain fires. The sub-dispatched reviewer scales effort to the change — a 3-line typo fix does not need a 10-angle audit, and a 3000-line framework change should not get a 2-angle rubber stamp. Output is a categorized Jira comment with pass/block per angle plus a bundled-scope decision if out-of-scope commits rode along.
 ---
 
 # Jira Architect Review
 
-Run a right-sized enterprise architect review on a feature branch. Sub-dispatched during subtask 8 of the `jira-sprint-workflow` chain, or manually when the user wants a production-readiness check.
+Run a right-sized enterprise architect review on a feature branch. Sub-dispatched during subtask 7 of the `jira-sprint-workflow` chain (runs BEFORE sandbox deploy as a gate on whether the diff is worth deploying), or manually when the user wants a production-readiness check.
 
 The review scales effort to the change:
 
@@ -22,7 +22,7 @@ The 10-angle review was designed for framework-level changes. Applying it to eve
 
 ## When the skill activates
 
-- Subtask 8 in the `jira-sprint-workflow` chain fires
+- Subtask 7 in the `jira-sprint-workflow` chain fires
 - User explicitly invokes: "architect-review this branch", "prod-readiness on WFR-X", "review the diff for WFR-5"
 - Someone finishing a feature wants a final check before opening a PR
 
@@ -40,7 +40,7 @@ Fetch from Jira:
 - Parent Task description (spec, requirements, out-of-scope)
 - Subtask 2 code review comment (if present — context for what's already been caught)
 - Subtask 4 UI testing comment (if present)
-- Subtask 7 manual-test comment (if present — tells you what the human verified)
+- (No manual-test comment yet — architect review now runs BEFORE sandbox deploy + sandbox manual test, so #10's human walkthrough doesn't exist when this skill fires.)
 
 Fetch from git:
 - Full diff `git diff main...<feature-branch>` (or `HEAD` of the worktree vs `origin/main`)
@@ -177,6 +177,6 @@ Read these only when you reach the relevant step.
 
 ## Related skills
 
-- `jira-story-design` — creates the Story + subtasks; this skill is dispatched from subtask 8 of the resulting chain
-- `jira-story-execute` — runs the 11-subtask chain; invokes this skill for subtask 8
+- `jira-story-design` — creates the Story + subtasks; this skill is dispatched from subtask 7 of the resulting chain
+- `jira-story-execute` — runs the 15-subtask chain; invokes this skill for subtask 7
 - `superpowers:code-reviewer` — generic code-review skill. This one is focused on architecture + production readiness, at the size-adjusted depth.

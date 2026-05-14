@@ -145,7 +145,10 @@ Some subtasks explicitly call out sub-skills the sub-agent should invoke:
 
 - Subtask 1 (Implement) → use `superpowers:subagent-driven-development` to run chunk-by-chunk
 - Subtask 2 (Code Review) → use `superpowers:code-reviewer` with the cross-system checklist
-- Subtask 8 (Architect Review) → use `superpowers:code-reviewer` framed as enterprise architect, 10 angles
+- Subtask 7 (Architect Review) → prefer `jira-architect-review` (right-sizes 3 / 5 / 7 / 10 angles to the diff); fall back to `superpowers:code-reviewer` framed as enterprise architect
+- Subtask 9 (Deploy to Sandbox) → no sub-skill required; sub-agent runs the team's sandbox deploy commands (Docker on sandbox host or `terraform apply` against the sandbox AWS profile)
+- Subtask 12 (Merge to Sandbox Branch) → no sub-skill; sub-agent uses `gh pr create` + `gh pr merge` once the human posts the `Approved — merge to sandbox branch` comment
+- Subtask 13 (Push to Prod) → no sub-skill; sub-agent opens `sandbox → main` PR via `gh pr create` and stops, waiting for human merge
 
 These are nested sub-agent dispatches. The outer sub-agent (spawned by this orchestrator) treats the inner sub-skill's output as one more progress checkpoint.
 
@@ -156,4 +159,5 @@ These are nested sub-agent dispatches. The outer sub-agent (spawned by this orch
 - Do NOT skip the prelude (transition + comment). Resumption depends on it.
 - Do NOT return vague "done" messages. The orchestrator parses VERDICT / NEXT_ACTION fields — missing them breaks the chain.
 - Do NOT work outside the assigned worktree. Mixing workspaces corrupts other work.
-- Do NOT commit to `main` directly (that's subtask 9's job only).
+- Do NOT commit to `main` directly. Only subtask 13 (Push to Prod) opens the PR `sandbox → main`; the merge to `main` is always via PR clicked by the human.
+- Do NOT merge to the `sandbox` branch from any subtask other than 12 (Merge to Sandbox Branch), and only after the human owner posts the `Approved — merge to sandbox branch` comment.
